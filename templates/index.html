@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Đếm Calo Thông Minh</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            text-align: center;
+            width: 450px;
+        }
+        h1 { color: #2c3e50; margin-bottom: 10px; }
+        p.subtitle { color: #7f8c8d; margin-bottom: 30px; }
+        
+        /* Phần upload ảnh */
+        .upload-area {
+            border: 2px dashed #3498db;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 25px;
+            cursor: pointer;
+            transition: 0.3s;
+            background: #f8fbff;
+        }
+        .upload-area:hover { background: #eaf2ff; border-color: #2980b9; }
+        
+        #fileInput { display: none; }
+        
+        .preview-img {
+            max-width: 100%;
+            max-height: 250px;
+            border-radius: 10px;
+            margin-top: 15px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        /* Nút bấm */
+        button {
+            background-color: #27ae60;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 30px;
+            font-size: 18px;
+            cursor: pointer;
+            transition: 0.3s;
+            width: 100%;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(39, 174, 96, 0.3);
+        }
+        button:hover { background-color: #219150; transform: translateY(-2px); }
+        button:disabled { background-color: #bdc3c7; cursor: not-allowed; transform: none; box-shadow: none; }
+
+        /* Kết quả */
+        .result-box {
+            margin-top: 30px;
+            text-align: left;
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 15px;
+            border: 1px solid #eee;
+            display: none;
+            animation: fadeIn 0.5s;
+        }
+        
+        .result-title {
+            font-size: 18px;
+            color: #34495e;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        .label { color: #7f8c8d; }
+        .value { color: #2c3e50; font-weight: bold; }
+        .value.calo { color: #e74c3c; font-size: 18px; }
+
+        .error-msg {
+            color: #c0392b;
+            background: #ffecec;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 15px;
+            display: none;
+        }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🥗 AI Quét Calo</h1>
+    <p class="subtitle">Tự động nhận diện & tính toán dinh dưỡng</p>
+    
+    <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+        <p id="uploadText">📷 Nhấn vào đây để chọn ảnh</p>
+        <input type="file" id="fileInput" accept="image/*" onchange="previewImage(this)">
+        <img id="preview" class="preview-img" src="#" alt="Preview">
+    </div>
+
+    <!-- ĐÃ BỎ Ô NHẬP GRAM -->
+    
+    <button id="scanBtn" onclick="scanFood()" disabled>🔥 BẮT ĐẦU QUÉT</button>
+
+    <div id="error" class="error-msg"></div>
+
+    <div id="result" class="result-box">
+        <div class="result-title">📊 Kết quả phân tích</div>
+        
+        <div class="result-item">
+            <span class="label">Món ăn phát hiện:</span>
+            <span id="foodName" class="value">-</span>
+        </div>
+        
+        <!-- SỬA ĐỔI: Hiển thị gram do AI tính -->
+        <div class="result-item">
+            <span class="label">⚖️ Khối lượng (AI ước tính):</span>
+            <span id="grams" class="value">-</span>
+        </div>
+
+        <div class="result-item">
+            <span class="label">🔥 Tổng Calories:</span>
+            <span id="calories" class="value calo">-</span>
+        </div>
+        
+        <div class="result-item">
+            <span class="label">🥩 Protein:</span>
+            <span id="protein" class="value">-</span>
+        </div>
+        
+        <div class="result-item">
+            <span class="label">🍞 Carbs:</span>
+            <span id="carbs" class="value">-</span>
+        </div>
+        
+        <div class="result-item">
+            <span class="label">🧈 Fat:</span>
+            <span id="fat" class="value">-</span>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Hàm xem trước ảnh
+    function previewImage(input) {
+        if (input.files && input.files[0]) {
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('preview').src = e.target.result;
+                document.getElementById('preview').style.display = 'block';
+                document.getElementById('uploadText').style.display = 'none';
+                document.getElementById('scanBtn').disabled = false; // Bật nút quét
+            }
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
+    // Hàm gọi API
+    async function scanFood() {
+        const fileInput = document.getElementById('fileInput');
+        const file = fileInput.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        // UI Loading
+        const btn = document.getElementById('scanBtn');
+        btn.disabled = true;
+        btn.innerText = "⏳ Đang phân tích...";
+        
+        document.getElementById('result').style.display = 'none';
+        document.getElementById('error').style.display = 'none';
+
+        try {
+            const response = await fetch('/scan-food', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                // Cập nhật kết quả
+                document.getElementById('foodName').innerText = data.detected_items.join(', ');
+                
+                // SỬA ĐỔI: Lấy dữ liệu từ biến total_gram do Python trả về
+                document.getElementById('grams').innerText = data.total_gram + " g";
+                
+                document.getElementById('calories').innerText = data.total_calories + " kcal";
+                document.getElementById('protein').innerText = data.total_protein + " g";
+                document.getElementById('carbs').innerText = data.total_carbs + " g";
+                document.getElementById('fat').innerText = data.total_fat + " g";
+                
+                document.getElementById('result').style.display = 'block';
+            } else {
+                // Hiện lỗi
+                document.getElementById('error').innerText = "❌ Lỗi: " + data.detail;
+                document.getElementById('error').style.display = 'block';
+            }
+        } catch (err) {
+            document.getElementById('error').innerText = "❌ Lỗi kết nối Server!";
+            document.getElementById('error').style.display = 'block';
+        } finally {
+            // Reset nút
+            btn.disabled = false;
+            btn.innerText = "🔥 BẮT ĐẦU QUÉT";
+        }
+    }
+</script>
+
+</body>
+</html>
